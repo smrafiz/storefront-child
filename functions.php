@@ -57,7 +57,7 @@ function child_theme_setup() {
 	remove_action( 'storefront_footer', 'storefront_credit', 20 );
 	add_action( 'storefront_footer', 'child_theme_storefront_credit', 20 );
 	add_action( 'storefront_before_footer', 'child_theme_storefront_footer_upper' );
-
+	add_action( 'storefront_before_content', 'rtsb_custom_header_content' );
 }
 
 function child_theme_storefront_footer_upper() {
@@ -470,6 +470,80 @@ function rtsb_custom_redirect() {
 	}
 }
 
+function rtsb_custom_header_content(){
+	$id   = get_queried_object_id();
+	$data = get_post_meta( $id, '_sb_custom_post_meta_key', true );
+
+	if ( ! empty( $data['sb_template_type'] ) && ! empty( $data['sb_template_name'] ) ) {
+		?>
+        <div class="shopbuilder-breadcrumb">
+            <div class="col-full">
+                <p><?php echo esc_html($data['sb_template_type']); ?></p>
+                <h1><?php echo esc_html($data['sb_template_name']); ?></h1>
+            </div>
+        </div>
+		<?php
+	}
+}
+
+add_action( 'admin_menu', 'rtsb_custom_add_metabox' );
+function rtsb_custom_add_metabox() {
+	add_meta_box( 'custom_sb_metabox', 'ShopBuilder Page Settings', 'rtsb_render_custom_metabox_box', [
+		'page',
+		'post',
+		'rtsb_builder'
+	], 'normal', 'default' );
+}
+
+function rtsb_render_custom_metabox_box( $post ) {
+	wp_nonce_field( 'custom_sb_post_meta', 'sb_custom_post_nonce' );
+	$data = get_post_meta( $post->ID, '_sb_custom_post_meta_key', true );
 
 
+	$sb_template_type = isset( $data['sb_template_type'] ) ? $data['sb_template_type'] : '';
 
+	$sb_template_name = isset( $data['sb_template_name'] ) ? $data['sb_template_name'] : '';
+
+	?>
+
+    <p>
+        <label class="meta-label" for="sb_template_name">Custom Page Title</label>
+        <input type="text" id="sb_template_name" name="sb_template_name" class="widefat"
+               value="<?php echo esc_attr( $sb_template_name ); ?>">
+    </p>
+
+    <p>
+        <label class="meta-label" for="sb_template_type">Custom Page Subtitle</label>
+        <input type="text" id="sb_template_type" name="sb_template_type" class="widefat"
+               value="<?php echo esc_attr( $sb_template_type ); ?>">
+    </p>
+	<?php
+}
+
+add_action( 'save_post', 'rtsb_custom_save_metaboxes' );
+function rtsb_custom_save_metaboxes( $post_id ) {
+	if ( ! isset( $_POST['sb_custom_post_nonce'] ) ) {
+		return $post_id;
+	}
+
+	$nonce = $_POST['sb_custom_post_nonce'];
+
+	if ( ! wp_verify_nonce( $nonce, 'custom_sb_post_meta' ) ) {
+		return $post_id;
+	}
+
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return $post_id;
+	}
+
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return $post_id;
+	}
+
+	$data = array(
+		'sb_template_type' => sanitize_text_field( $_POST['sb_template_type'] ),
+		'sb_template_name' => sanitize_text_field( $_POST['sb_template_name'] ),
+	);
+
+	update_post_meta( $post_id, '_sb_custom_post_meta_key', $data );
+}
